@@ -40,8 +40,8 @@ steps:
       - ${_GCP_REGION}-docker.pkg.dev/${_GCP_PROJECT_ID}/${_PROVISIONER_REPO}/${_SERVICE_NAME}:${_IMAGE_TAG}
 
   # Deploy to Cloud Run.
-  # The agent uses Application Default Credentials (Cloud Run service account)
-  # to fetch OIDC tokens for the MCP servers.
+  # --ingress: internal — only callable by Agent Runtime / Agent Registry, not the public internet.
+  # --no-allow-unauthenticated: requires a valid Google-signed OIDC token (Cloud Run invoker role).
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: gcloud
     args:
@@ -55,8 +55,8 @@ steps:
       - --platform
       - managed
       - --ingress
-      - all
-      - --allow-unauthenticated
+      - internal
+      - --no-allow-unauthenticated
       - --port
       - ${_AGENT_PORT}
       - --set-env-vars
