@@ -3,10 +3,10 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN go build -o entra-mcp .
+RUN go build -o pingone-aic-mcp .
 
 FROM alpine:latest
 WORKDIR /app
-COPY --from=builder /app/entra-mcp .
+COPY --from=builder /app/pingone-aic-mcp .
 EXPOSE 8080
-CMD ["./entra-mcp"]
+CMD ["./pingone-aic-mcp"]

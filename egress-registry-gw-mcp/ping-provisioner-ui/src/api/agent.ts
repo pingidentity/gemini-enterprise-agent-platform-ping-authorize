@@ -54,6 +54,7 @@ async function getGoogleToken(aicToken: string): Promise<string> {
   return fedToken;
 }
 
+// v2: token passed as message prefix; session state API not used
 export async function invokeProvisionerAgent(message: string, aicToken: string): Promise<string> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120_000);
@@ -61,15 +62,15 @@ export async function invokeProvisionerAgent(message: string, aicToken: string):
   try {
     const googleToken = await getGoogleToken(aicToken);
 
-    // Create a session with the raw AIC token in state — the agent performs
-    // RFC 8693 exchange internally before the first MCP call.
+    // The Agent Runtime sessions API does not support object state — create
+    // a plain session and pass the AIC token as a message prefix instead.
     const sessionRes = await fetch(`${VERTEX_BASE}/${ENGINE_PATH}/sessions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${googleToken}`,
       },
-      body: JSON.stringify({ state: { bearer_token: aicToken } }),
+      body: JSON.stringify({ user_id: 'ping-user' }),
       signal: controller.signal,
     });
     if (!sessionRes.ok) {
@@ -77,7 +78,10 @@ export async function invokeProvisionerAgent(message: string, aicToken: string):
       throw new Error(`Session creation failed ${sessionRes.status}: ${err}`);
     }
     const session = await sessionRes.json();
-    const sessionId: string = session.id ?? session.name?.split('/').pop();
+    // Response is a long-running operation; session is nested under response.name
+    const sessionName: string = session.response?.name ?? session.name ?? '';
+    const sessionId: string = sessionName.split('/').pop()!;
+    const userId: string = session.response?.userId ?? session.userId ?? 'ping-user';
 
     // Stream the query and collect the final text response.
     const queryRes = await fetch(
@@ -91,9 +95,11 @@ export async function invokeProvisionerAgent(message: string, aicToken: string):
         body: JSON.stringify({
           class_method: 'stream_query',
           input: {
-            user_id: session.userId ?? 'browser-user',
+            user_id: userId,
             session_id: sessionId,
-            message: message,
+            // Prefix the AIC token so the agent's before_model_callback can
+            // extract it and store it in session state for header_provider.
+            message: `__AIC__:${aicToken} ${message}`,
           },
         }),
         signal: controller.signal,

@@ -1,10 +1,8 @@
 """ADK provisioner agent with direct MCP server connections.
 
-The agent calls the PingOne AIC and Entra MCP servers directly via their
-Cloud Run URLs. The Agent Gateway (ping-authz-agent-gateway) and authz policy
-(ping-authz-shim) are registered in GCP Agent Registry; when google-adk
-[agent-identity] goes GA the single-line swap to AgentRegistry.get_mcp_toolset()
-will put the gateway back in the call path with full policy enforcement.
+The agent calls the PingOne AIC MCP server directly via its Cloud Run URL.
+The Agent Gateway (ping-authz-agent-gateway) and authz policy (ping-authz-shim)
+are registered in GCP Agent Registry and handle policy enforcement.
 
 Invoke:
     POST https://ping-provisioner-agent-uu2pkgxfka-uc.a.run.app/provision
@@ -22,21 +20,17 @@ logger = logging.getLogger(__name__)
 
 SYSTEM_PROMPT = """\
 You are an identity provisioning agent. You have tools to manage user accounts
-in two separate identity systems:
-
-  - PingOne AIC (ForgeRock Identity Cloud) — tools prefixed with pingone_
-  - Microsoft Entra (Azure AD) — tools prefixed with entra_
+in PingOne AIC (ForgeRock Identity Cloud) — tools prefixed with pingone_.
 
 Available tools:
-  pingone_provision_user / entra_provision_user        — create a new user account
-  pingone_deprovision_user / entra_deprovision_user    — permanently delete a user
-  pingone_update_user_status / entra_update_user_status — enable or disable an account
-  pingone_list_users / entra_list_users                — search or list accounts
+  pingone_provision_user       — create a new user account
+  pingone_deprovision_user     — permanently delete a user
+  pingone_update_user_status   — enable or disable an account
+  pingone_list_users           — search or list accounts
 
 When you receive an instruction:
-1. Determine which identity system(s) to act on.
-2. Call the appropriate prefixed tool(s) with the correct arguments.
-3. Report the result clearly, including any IDs or errors returned.
+1. Call the appropriate tool with the correct arguments.
+2. Report the result clearly, including any IDs or errors returned.
 
 If a request is rejected, report the reason without retrying.
 """
@@ -54,7 +48,6 @@ def _get_oidc_token(audience: str) -> str:
 async def _auth_headers(url: str) -> dict[str, str]:
     """Return an Authorization header for the given URL, best-effort."""
     try:
-        # Audience = scheme + host (e.g. https://foo-uc.a.run.app)
         from urllib.parse import urlparse  # noqa: PLC0415
         parsed = urlparse(url)
         audience = f"{parsed.scheme}://{parsed.netloc}"
@@ -66,14 +59,12 @@ async def _auth_headers(url: str) -> dict[str, str]:
 
 
 async def create_agent() -> LlmAgent:
-    """Build an LlmAgent with MCPToolsets pointing at each MCP server directly."""
+    """Build an LlmAgent with an MCPToolset pointing at the PingOne AIC MCP server."""
     pingone_url = settings.pingone_aic_mcp_url
-    entra_url = settings.entra_mcp_url
 
-    logger.info("Creating agent: pingone=%s entra=%s", pingone_url, entra_url)
+    logger.info("Creating agent: pingone=%s", pingone_url)
 
     pingone_headers = await _auth_headers(pingone_url)
-    entra_headers = await _auth_headers(entra_url)
 
     pingone_tools = MCPToolset(
         connection_params=StreamableHTTPConnectionParams(
@@ -83,17 +74,9 @@ async def create_agent() -> LlmAgent:
         tool_name_prefix="pingone_",
     )
 
-    entra_tools = MCPToolset(
-        connection_params=StreamableHTTPConnectionParams(
-            url=entra_url,
-            headers=entra_headers,
-        ),
-        tool_name_prefix="entra_",
-    )
-
     return LlmAgent(
         name="ping_provisioner",
         model=settings.gemini_model,
         instruction=SYSTEM_PROMPT,
-        tools=[pingone_tools, entra_tools],
+        tools=[pingone_tools],
     )

@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # setup-agent-registry.sh
 #
-# Registers the gw-ping-provisioner-agent, gw-pingone-aic-mcp-server, and
-# gw-entra-mcp-server in GCP Agent Registry, then creates the Agent Gateway
+# Registers the gw-ping-provisioner-agent and gw-pingone-aic-mcp-server in
+# GCP Agent Registry, then creates the Agent Gateway
 # (egress) and attaches the PingAuthorize authz extension.
 #
 # Prerequisites:
@@ -44,10 +44,6 @@ PINGONE_MCP_URL=$(gcloud run services describe gw-pingone-aic-mcp \
   --region="${REGION}" --project="${PROJECT_ID}" \
   --format='value(status.url)')
 
-ENTRA_MCP_URL=$(gcloud run services describe gw-entra-mcp \
-  --region="${REGION}" --project="${PROJECT_ID}" \
-  --format='value(status.url)')
-
 AUTHZ_SHIM_URL=$(gcloud run services describe gw-ping-authz-shim \
   --region="${REGION}" --project="${PROJECT_ID}" \
   --format='value(status.url)')
@@ -57,8 +53,7 @@ AUTHZ_SHIM_FQDN="${AUTHZ_SHIM_URL#https://}"
 
 echo "  gw-ping-provisioner-agent : ${PROVISIONER_URL}"
 echo "  gw-pingone-aic-mcp        : ${PINGONE_MCP_URL}"
-echo "  gw-entra-mcp              : ${ENTRA_MCP_URL}"
-echo "  ping-authz-shim        : ${AUTHZ_SHIM_URL} (FQDN: ${AUTHZ_SHIM_FQDN})"
+echo "  ping-authz-shim           : ${AUTHZ_SHIM_URL} (FQDN: ${AUTHZ_SHIM_FQDN})"
 
 # ── Register gw-ping-provisioner-agent ─────────────────────────────────────────
 echo "==> Registering gw-ping-provisioner-agent in Agent Registry"
@@ -87,21 +82,6 @@ gcloud alpha agent-registry services create gw-pingone-aic-mcp-server \
        --location="${REGION}" \
        --mcp-server-spec-content="${REPO_DIR}/egress-registry-gw-mcp/pingone-aic-mcp/toolspec.json" \
        --interfaces="url=${PINGONE_MCP_URL},protocolBinding=JSONRPC"
-
-# ── Register gw-entra-mcp-server ───────────────────────────────────────────────
-echo "==> Registering gw-entra-mcp-server in Agent Registry"
-gcloud alpha agent-registry services create gw-entra-mcp-server \
-  --project="${PROJECT_ID}" \
-  --location="${REGION}" \
-  --display-name="Microsoft Entra Provisioner MCP Server" \
-  --mcp-server-spec-type=tool-spec \
-  --mcp-server-spec-content="${REPO_DIR}/egress-registry-gw-mcp/entra-mcp/toolspec.json" \
-  --interfaces="url=${ENTRA_MCP_URL},protocolBinding=JSONRPC" \
-  || gcloud alpha agent-registry services update gw-entra-mcp-server \
-       --project="${PROJECT_ID}" \
-       --location="${REGION}" \
-       --mcp-server-spec-content="${REPO_DIR}/egress-registry-gw-mcp/entra-mcp/toolspec.json" \
-       --interfaces="url=${ENTRA_MCP_URL},protocolBinding=JSONRPC"
 
 # ── Verify Agent Registry entries ───────────────────────────────────────────
 echo "==> Registered agents:"

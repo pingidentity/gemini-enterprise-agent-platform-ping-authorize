@@ -34,8 +34,8 @@ execution.
 
 **Directory:** [`egress-registry-gw-mcp/`](./egress-registry-gw-mcp/)
 
-A React chat UI lets administrators provision user accounts across PingOne AIC
-and Microsoft Entra by conversing with a Gemini AI agent. The agent runs on the
+A React chat UI lets administrators provision user accounts in **PingOne AIC**
+by conversing with a Gemini AI agent. The agent runs on the
 **Gemini Enterprise Agent Platform**; every MCP tool call routes through the
 **GCP Agent Gateway** and is authorized by PingAuthorize before reaching a backend.
 
@@ -64,7 +64,7 @@ gRPC service attached to the network control plane:
 |---|---|---|
 | **Control plane** | GCP Regional Load Balancer | GCP Agent Gateway |
 | **Shim attachment** | Traffic Extension (ext_proc on URL map) | CONTENT_AUTHZ authz extension + policy |
-| **Token flow** | RFC 8693 in agent backend | RFC 8693 inside Agent Runtime |
+| **Token flow** | RFC 8693 in agent backend | RFC 8693 inside Agent Platform |
 | **Identity federation** | PingOne AIC only | PingOne AIC → WIF → Google STS |
 
 In both cases, `ping-authz-shim` parses the MCP JSON-RPC body, extracts the

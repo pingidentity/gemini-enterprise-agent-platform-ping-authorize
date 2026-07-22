@@ -6,7 +6,7 @@
 # mcp_email, mcp_username) before the request reaches the MCP backends.
 #
 # Modifications from UC1:
-#   - Accepts /mcp/pingone and /mcp/entra paths (not just /mcp)
+#   - Accepts /mcp/pingone and /mcp/* paths (not just /mcp)
 #   - Extracts provisioning attrs (email, username, enabled) for policy decisions
 #
 # Pipeline: Build image → Push to Artifact Registry → Deploy to Cloud Run

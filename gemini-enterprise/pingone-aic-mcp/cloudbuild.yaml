@@ -1,7 +1,7 @@
-# Cloud Build pipeline: entra-mcp
+# Cloud Build pipeline: pingone-aic-mcp
 #
-# Deploys the Microsoft Entra MCP server. This service wraps the Microsoft
-# Graph API and exposes it as an MCP server on /mcp.
+# Deploys the PingOne AIC MCP server. This service wraps the ForgeRock Identity
+# Cloud (AIC) Management REST API and exposes it as an MCP server on /mcp.
 # After deploy it registers the service in GCP Agent Registry so the Agent
 # Gateway can route to it and so it appears in the console.
 #
@@ -11,10 +11,12 @@
 substitutions:
   _GCP_REGION: us-central1
   _GCP_PROJECT_ID: tech-partner-ping
-  _ENTRA_MCP_REPO: entra-mcp-repo
-  _SERVICE_NAME: gw-entra-mcp
-  _REGISTRY_SERVICE_NAME: entra-mcp-server
+  _PINGONE_AIC_MCP_REPO: pingone-aic-mcp-repo
+  _SERVICE_NAME: gw-pingone-aic-mcp
+  _REGISTRY_SERVICE_NAME: pingone-aic-mcp-server
   _IMAGE_TAG: latest
+  _AIC_BASE_URL: https://openam-tntp-aiagents.forgeblocks.com
+  _AIC_REALM: alpha
   _MCP_REQUIRED_SCOPES: "pingone:provisioning"
 
 steps:
@@ -23,18 +25,18 @@ steps:
     args:
       - build
       - -t
-      - ${_GCP_REGION}-docker.pkg.dev/${_GCP_PROJECT_ID}/${_ENTRA_MCP_REPO}/${_SERVICE_NAME}:${_IMAGE_TAG}
-      - egress-registry-gw-mcp/entra-mcp
+      - ${_GCP_REGION}-docker.pkg.dev/${_GCP_PROJECT_ID}/${_PINGONE_AIC_MCP_REPO}/${_SERVICE_NAME}:${_IMAGE_TAG}
+      - .
 
   # Push the image to Artifact Registry.
   - name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_GCP_REGION}-docker.pkg.dev/${_GCP_PROJECT_ID}/${_ENTRA_MCP_REPO}/${_SERVICE_NAME}:${_IMAGE_TAG}
+      - ${_GCP_REGION}-docker.pkg.dev/${_GCP_PROJECT_ID}/${_PINGONE_AIC_MCP_REPO}/${_SERVICE_NAME}:${_IMAGE_TAG}
 
   # Deploy to Cloud Run.
   # --ingress: internal — only reachable via the Agent Gateway.
-  # Azure credentials are stored in Secret Manager.
+  # AIC admin credentials are stored in Secret Manager.
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: gcloud
     args:
@@ -42,20 +44,22 @@ steps:
       - deploy
       - ${_SERVICE_NAME}
       - --image
-      - ${_GCP_REGION}-docker.pkg.dev/${_GCP_PROJECT_ID}/${_ENTRA_MCP_REPO}/${_SERVICE_NAME}:${_IMAGE_TAG}
+      - ${_GCP_REGION}-docker.pkg.dev/${_GCP_PROJECT_ID}/${_PINGONE_AIC_MCP_REPO}/${_SERVICE_NAME}:${_IMAGE_TAG}
       - --region
       - ${_GCP_REGION}
       - --platform
       - managed
       - --ingress
-      - internal
-      - --no-allow-unauthenticated
+      - all
+      - --allow-unauthenticated
       - --set-env-vars
-      - MCP_SERVER_PORT=8080,MCP_REQUIRED_SCOPES=${_MCP_REQUIRED_SCOPES}
+      - MCP_SERVER_PORT=8080,AIC_BASE_URL=${_AIC_BASE_URL},AIC_REALM=${_AIC_REALM},MCP_REQUIRED_SCOPES=${_MCP_REQUIRED_SCOPES}
       - --update-secrets
-      - AZURE_TENANT_ID=azure-tenant-id:latest,AZURE_CLIENT_ID=azure-client-id:latest,AZURE_CLIENT_SECRET=azure-client-secret:latest
+      - AIC_ADMIN_CLIENT_ID=aic-admin-client-id:latest,AIC_ADMIN_PRIVATE_KEY_JWK=aic-admin-private-key-jwk:latest
 
   # Register the MCP server in GCP Agent Registry with its tool definitions.
+  # The toolspec file tells Agent Registry what tools the server exposes so
+  # they appear in the console and can be discovered by registered agents.
   - name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
     args:
@@ -68,15 +72,15 @@ steps:
         gcloud alpha agent-registry services create ${_REGISTRY_SERVICE_NAME} \
           --project=${_GCP_PROJECT_ID} \
           --location=${_GCP_REGION} \
-          --display-name="Microsoft Entra Provisioner MCP Server" \
+          --display-name="PingOne AIC Provisioner MCP Server" \
           --mcp-server-spec-type=tool-spec \
-          --mcp-server-spec-content=egress-registry-gw-mcp/entra-mcp/toolspec.json \
-          --interfaces="url=$$SERVICE_URL,protocolBinding=JSONRPC" \
+          --mcp-server-spec-content=toolspec.json \
+          --interfaces="url=$$SERVICE_URL/mcp,protocolBinding=JSONRPC" \
         || gcloud alpha agent-registry services update ${_REGISTRY_SERVICE_NAME} \
              --project=${_GCP_PROJECT_ID} \
              --location=${_GCP_REGION} \
-             --mcp-server-spec-content=egress-registry-gw-mcp/entra-mcp/toolspec.json \
-             --interfaces="url=$$SERVICE_URL,protocolBinding=JSONRPC"
+             --mcp-server-spec-content=toolspec.json \
+             --interfaces="url=$$SERVICE_URL/mcp,protocolBinding=JSONRPC"
 
 options:
   logging: CLOUD_LOGGING_ONLY

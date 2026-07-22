@@ -9,8 +9,8 @@ import (
 	"github.com/mark3labs/mcp-go/server"
 )
 
-// registerEntraMcpTools adds all Entra provisioning MCP tools to the server.
-func registerEntraMcpTools(s *server.MCPServer) {
+// registerAicMcpTools adds all AIC provisioning MCP tools to the server.
+func registerAicMcpTools(s *server.MCPServer) {
 	s.AddTool(provisionUserTool())
 	s.AddTool(deprovisionUserTool())
 	s.AddTool(updateUserStatusTool())
@@ -19,14 +19,14 @@ func registerEntraMcpTools(s *server.MCPServer) {
 
 func provisionUserTool() (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("provision_user",
-		mcp.WithDescription("Create a new user account in Microsoft Entra (Azure AD). Returns the new user's object ID and UPN."),
+		mcp.WithDescription("Create a new user account in PingOne AIC (ForgeRock Identity Cloud). Returns the new user's internal ID."),
 		mcp.WithString("username",
 			mcp.Required(),
-			mcp.Description("Unique username / mail nickname (e.g. alice.smith). Used as the mailNickname and to derive the UPN if email is not a UPN."),
+			mcp.Description("Unique username for the new account (e.g. alice.smith)."),
 		),
 		mcp.WithString("email",
 			mcp.Required(),
-			mcp.Description("Email address / UPN for the new account (e.g. alice@yourtenant.onmicrosoft.com)."),
+			mcp.Description("Email address for the new account (e.g. alice@example.com)."),
 		),
 		mcp.WithString("first_name",
 			mcp.Description("User's given name."),
@@ -36,7 +36,7 @@ func provisionUserTool() (mcp.Tool, server.ToolHandlerFunc) {
 		),
 		mcp.WithString("password",
 			mcp.Required(),
-			mcp.Description("Initial password. Must meet Entra password complexity requirements."),
+			mcp.Description("Initial password for the account. Must meet AIC complexity requirements."),
 		),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -56,10 +56,10 @@ func provisionUserTool() (mcp.Tool, server.ToolHandlerFunc) {
 		lastName := req.GetString("last_name", "")
 
 		log.Printf("tool=provision_user username=%s email=%s", username, email)
-		result, err := CreateEntraUser(username, email, firstName, lastName, password)
+		result, err := CreateAicUser(username, email, firstName, lastName, password)
 		if err != nil {
 			log.Printf("tool=provision_user error: %v", err)
-			return mcp.NewToolResultError(fmt.Sprintf("Entra error: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("AIC error: %v", err)), nil
 		}
 		log.Printf("tool=provision_user success: %s", result)
 		return mcp.NewToolResultText(result), nil
@@ -69,10 +69,10 @@ func provisionUserTool() (mcp.Tool, server.ToolHandlerFunc) {
 
 func deprovisionUserTool() (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("deprovision_user",
-		mcp.WithDescription("Permanently delete a user account from Microsoft Entra by their email / UPN."),
+		mcp.WithDescription("Permanently delete a user account from PingOne AIC by their email address."),
 		mcp.WithString("email",
 			mcp.Required(),
-			mcp.Description("Email address or UPN of the user to delete."),
+			mcp.Description("Email address of the user to delete."),
 		),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -81,10 +81,10 @@ func deprovisionUserTool() (mcp.Tool, server.ToolHandlerFunc) {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
 		log.Printf("tool=deprovision_user email=%s", email)
-		result, err := DeleteEntraUser(email)
+		result, err := DeleteAicUser(email)
 		if err != nil {
 			log.Printf("tool=deprovision_user error: %v", err)
-			return mcp.NewToolResultError(fmt.Sprintf("Entra error: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("AIC error: %v", err)), nil
 		}
 		log.Printf("tool=deprovision_user success: %s", result)
 		return mcp.NewToolResultText(result), nil
@@ -94,14 +94,14 @@ func deprovisionUserTool() (mcp.Tool, server.ToolHandlerFunc) {
 
 func updateUserStatusTool() (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("update_user_status",
-		mcp.WithDescription("Enable or disable a user account in Microsoft Entra (sets accountEnabled)."),
+		mcp.WithDescription("Enable or disable a user account in PingOne AIC."),
 		mcp.WithString("email",
 			mcp.Required(),
-			mcp.Description("Email address or UPN of the user to update."),
+			mcp.Description("Email address of the user to update."),
 		),
 		mcp.WithBoolean("enabled",
 			mcp.Required(),
-			mcp.Description("Set to true to enable the account, false to disable it."),
+			mcp.Description("Set to true to activate the account, false to deactivate it."),
 		),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -111,10 +111,10 @@ func updateUserStatusTool() (mcp.Tool, server.ToolHandlerFunc) {
 		}
 		enabled := req.GetBool("enabled", true)
 		log.Printf("tool=update_user_status email=%s enabled=%v", email, enabled)
-		result, err := UpdateEntraUserStatus(email, enabled)
+		result, err := UpdateAicUserStatus(email, enabled)
 		if err != nil {
 			log.Printf("tool=update_user_status error: %v", err)
-			return mcp.NewToolResultError(fmt.Sprintf("Entra error: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("AIC error: %v", err)), nil
 		}
 		log.Printf("tool=update_user_status success: %s", result)
 		return mcp.NewToolResultText(result), nil
@@ -124,18 +124,18 @@ func updateUserStatusTool() (mcp.Tool, server.ToolHandlerFunc) {
 
 func listUsersTool() (mcp.Tool, server.ToolHandlerFunc) {
 	tool := mcp.NewTool("list_users",
-		mcp.WithDescription("List or search user accounts in Microsoft Entra. Returns id, UPN, displayName, mail, and accountEnabled for each matching user."),
+		mcp.WithDescription("List or search user accounts in PingOne AIC. Returns id, username, email, name for each matching user."),
 		mcp.WithString("filter",
-			mcp.Description("Optional OData $filter expression (e.g. 'startsWith(mail, \"alice\")'). Leave empty to list all users."),
+			mcp.Description("Optional OpenIDM query filter (e.g. 'mail sw \"alice\"'). Leave empty to list all users."),
 		),
 	)
 	handler := func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 		filter := req.GetString("filter", "")
 		log.Printf("tool=list_users filter=%q", filter)
-		result, err := ListEntraUsers(filter)
+		result, err := ListAicUsers(filter)
 		if err != nil {
 			log.Printf("tool=list_users error: %v", err)
-			return mcp.NewToolResultError(fmt.Sprintf("Entra error: %v", err)), nil
+			return mcp.NewToolResultError(fmt.Sprintf("AIC error: %v", err)), nil
 		}
 		return mcp.NewToolResultText(result), nil
 	}

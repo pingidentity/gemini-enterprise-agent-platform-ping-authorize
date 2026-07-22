@@ -1,13 +1,13 @@
 # GitHub/Copilot/Claude config
-.claude/settings.local.json
+.claude/
 
 # Go compiled binaries (same name as their parent directory)
 ingress-public-lb-mcp/stripe-mcp/stripe-mcp
 ingress-public-lb-mcp/ping-authz-shim/ping-authz-shim
-egress-registry-gw-mcp/entra-mcp/entra-mcp
 egress-registry-gw-mcp/pingone-aic-mcp/pingone-aic-mcp
 egress-registry-gw-mcp/ping-authz-shim/ping-authz-shim
 egress-registry-gw-mcp/ping-provisioner-agent-gw/ping-provisioner-agent-gw
+gemini-enterprise/pingone-aic-mcp/pingone-aic-mcp
 
 # Python
 __pycache__/
@@ -47,6 +47,9 @@ coverage.out
 .env.*.local
 *.pem
 *.key
+*.jwk
 service-account*.json
 gcp-credentials*.json
 application_default_credentials.json
+
+.playwright-mcp/

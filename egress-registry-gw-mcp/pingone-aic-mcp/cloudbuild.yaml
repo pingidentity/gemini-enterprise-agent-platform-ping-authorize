@@ -26,7 +26,7 @@ steps:
       - build
       - -t
       - ${_GCP_REGION}-docker.pkg.dev/${_GCP_PROJECT_ID}/${_PINGONE_AIC_MCP_REPO}/${_SERVICE_NAME}:${_IMAGE_TAG}
-      - egress-registry-gw-mcp/pingone-aic-mcp
+      - .
 
   # Push the image to Artifact Registry.
   - name: gcr.io/cloud-builders/docker
@@ -50,12 +50,12 @@ steps:
       - --platform
       - managed
       - --ingress
-      - internal
-      - --no-allow-unauthenticated
+      - all
+      - --allow-unauthenticated
       - --set-env-vars
       - MCP_SERVER_PORT=8080,AIC_BASE_URL=${_AIC_BASE_URL},AIC_REALM=${_AIC_REALM},MCP_REQUIRED_SCOPES=${_MCP_REQUIRED_SCOPES}
       - --update-secrets
-      - AIC_ADMIN_CLIENT_ID=aic-admin-client-id:latest,AIC_ADMIN_CLIENT_SECRET=aic-admin-client-secret:latest
+      - AIC_ADMIN_CLIENT_ID=aic-admin-client-id:latest,AIC_ADMIN_PRIVATE_KEY_JWK=aic-admin-private-key-jwk:latest
 
   # Register the MCP server in GCP Agent Registry with its tool definitions.
   # The toolspec file tells Agent Registry what tools the server exposes so
@@ -74,13 +74,13 @@ steps:
           --location=${_GCP_REGION} \
           --display-name="PingOne AIC Provisioner MCP Server" \
           --mcp-server-spec-type=tool-spec \
-          --mcp-server-spec-content=egress-registry-gw-mcp/pingone-aic-mcp/toolspec.json \
-          --interfaces="url=$$SERVICE_URL,protocolBinding=JSONRPC" \
+          --mcp-server-spec-content=toolspec.json \
+          --interfaces="url=$$SERVICE_URL/mcp,protocolBinding=JSONRPC" \
         || gcloud alpha agent-registry services update ${_REGISTRY_SERVICE_NAME} \
              --project=${_GCP_PROJECT_ID} \
              --location=${_GCP_REGION} \
-             --mcp-server-spec-content=egress-registry-gw-mcp/pingone-aic-mcp/toolspec.json \
-             --interfaces="url=$$SERVICE_URL,protocolBinding=JSONRPC"
+             --mcp-server-spec-content=toolspec.json \
+             --interfaces="url=$$SERVICE_URL/mcp,protocolBinding=JSONRPC"
 
 options:
   logging: CLOUD_LOGGING_ONLY

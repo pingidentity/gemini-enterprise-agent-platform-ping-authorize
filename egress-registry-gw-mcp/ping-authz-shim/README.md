@@ -14,7 +14,7 @@ Deployed as Cloud Run service `gw-ping-authz-shim` (internal ingress, HTTP/2).
 | Accepted paths | `/mcp` only | `/mcp`, `/mcp/*` |
 | Policy attributes | Stripe purchase fields | Identity provisioning fields |
 
-Path routing (`/mcp/pingone` vs `/mcp/entra`) tells PingAuthorize which
+The `:path` attribute (e.g. `/mcp/pingone`) tells PingAuthorize which
 identity system is targeted without needing to inspect the tool arguments.
 
 ## Policy Attributes
@@ -25,7 +25,7 @@ Sent to PingAuthorize on every `tools/call`:
 {
   "attributes": {
     "access_token": "<delegated bearer token>",
-    ":path": "/mcp/entra",
+    ":path": "/mcp/pingone",
     ":method": "POST",
     "mcp_method": "tools/call",
     "mcp_tool_name": "provision_user",

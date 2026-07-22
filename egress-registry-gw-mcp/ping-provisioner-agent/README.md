@@ -1,16 +1,14 @@
 # ping-provisioner-agent
 
-FastAPI + ADK Python service that provisions user accounts across PingOne AIC
-and Microsoft Entra. This service is deployed to **Cloud Run** via Cloud Build
-(`cloudbuild.ping-provisioner-agent.yaml`) and registered in GCP Agent Registry.
+ADK Python agent that provisions user accounts in PingOne AIC. Deployed to the
+**Gemini Enterprise Agent Platform** via `deploy_agent.py`.
 
-> **Note:** The production deployment of this agent uses **Vertex AI Agent Runtime**
-> via `deploy/gcp/deploy_agent.py` rather than this Cloud Run container directly.
-> The Agent Runtime deployment enables Workload Identity Federation, RFC 8693
-> token exchange, and AGENT_IDENTITY egress through the Agent Gateway.
-> This folder contains the Cloud Run-compatible version of the agent code.
+> **Note:** This folder also contains a Cloud Run-compatible `main.py` for local
+> development. The production deployment uses `deploy_agent.py`, which enables
+> Workload Identity Federation, RFC 8693 token exchange, and AGENT_IDENTITY
+> egress through the Agent Gateway.
 
-## Endpoints
+## Endpoints (Cloud Run / local)
 
 | Method | Path | Description |
 |---|---|---|
@@ -19,10 +17,10 @@ and Microsoft Entra. This service is deployed to **Cloud Run** via Cloud Build
 
 ```json
 // POST /provision
-{ "instruction": "Provision alice@example.com in both PingOne AIC and Entra" }
+{ "instruction": "Provision alice@example.com in PingOne AIC" }
 
 // Response
-{ "result": "Provisioned alice@example.com: AIC user_id=abc123, Entra user_id=def456" }
+{ "result": "Provisioned alice@example.com: AIC user_id=abc123" }
 ```
 
 ## Environment Variables
@@ -33,7 +31,6 @@ GOOGLE_CLOUD_LOCATION=us-central1
 AGENT_PORT=3000
 GEMINI_MODEL=gemini-2.5-flash
 PINGONE_AIC_MCP_URL=        # https://gw-pingone-aic-mcp-*.run.app/mcp
-ENTRA_MCP_URL=              # https://gw-entra-mcp-*.run.app/mcp
 ```
 
 ## Local Development
@@ -51,4 +48,4 @@ gcloud builds submit \
   --config egress-registry-gw-mcp/ping-provisioner-agent/cloudbuild.yaml .
 ```
 
-For Agent Runtime deployment (production), see `deploy_agent.py` in this folder.
+For Agent Platform deployment (production), see `deploy_agent.py` in this folder.
